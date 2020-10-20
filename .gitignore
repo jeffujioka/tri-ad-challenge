@@ -1,0 +1,48 @@
+# build directory
+.build/**
+
+# Output directory
+output/**
+
+# vscode
+.vscode/**
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.elf
+*.ko
+*.lo
+*.o
+*.obj
+*.slo
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
