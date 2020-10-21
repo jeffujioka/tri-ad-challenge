@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <cstring>
 
+// temporarily "disabling" it to to "get rid" of std::gets 
+// to be possible to compile with c++17
+#if 0
 struct Word
 {
   char * data;
@@ -127,11 +130,12 @@ static void lookupWords ()
       std::printf( "'%s' was NOT found in the initial word list\n", w->data );
   }
 }
-
+#endif
 int main ()
 {
   try
   {
+#if 0
     readInputWords();
     
     // Sort the words alphabetically
@@ -145,6 +149,7 @@ int main ()
     lookupWords();
 
     printf( "\n=== Total words found: %d\n", s_totalFound );
+#endif
   }
   catch (std::exception & e)
   {
