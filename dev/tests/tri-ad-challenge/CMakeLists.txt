@@ -1,7 +1,8 @@
 get_filename_component(JMF_MODULE_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src
-                    ${JMF_APP_DIR}/tri-ad-challenge)
+                    ${JMF_APP_DIR}/tri-ad-challenge/include
+                    ${JMF_LIB_DIR}/synchronization/include)
 
 file(GLOB_RECURSE SRCS "**.cpp")
 

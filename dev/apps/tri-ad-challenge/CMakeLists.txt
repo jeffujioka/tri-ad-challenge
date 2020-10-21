@@ -1,7 +1,9 @@
 get_filename_component(JMF_MODULE_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
 # Project's directory
-include_directories(.)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src
+                    ${JMF_LIB_DIR}/synchronization/include)
 
 # getting all source files ending with .cpp
 file(GLOB_RECURSE SRCS **.cpp)
