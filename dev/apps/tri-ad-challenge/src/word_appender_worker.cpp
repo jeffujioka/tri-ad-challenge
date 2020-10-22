@@ -12,17 +12,17 @@ WordAppenderWorker::WordAppenderWorker(MsgQueue<std::string>& queue,
 }
 
 void WordAppenderWorker::operator()() {
-  bool end_found = false;
+  bool shall_stop = false;
   
-  while (!end_found) // keep processing until not find "end"
+  while (!shall_stop) // keep processing until not find "end"
   {
     // blocking function, it will wait until a new message is available
     auto word = sync_queue_.Receive();
     // from this point producer is free to produce more data
 
-    end_found = word == stop_; // shall we stop processing? was "end" found?
+    shall_stop = word == stop_; // shall we stop processing? was "end" found?
     
-    if (!end_found)
+    if (!shall_stop)
     {
       // stop condition not found... so let's insert/increment a "new" word
       words_freq_->InsertOrIncrement(word); // it's thread safe
