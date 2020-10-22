@@ -3,20 +3,29 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "synchronization/msg_queue.h"
 
 namespace triad {
 
+namespace synchronization {
+template<typename T>
+class ObjectFrequency;
+}
+
 class WordAppenderWorker {
+  using WordFreq = synchronization::ObjectFrequency<std::string>;
+  using WordFreqPtr = std::shared_ptr<WordFreq>;
+
   synchronization::MsgQueue<std::string>& sync_queue_;
-  std::map<std::string, size_t>& words_map_;
+  WordFreqPtr words_freq_;
   std::string stop_;
 
 public:
   WordAppenderWorker(synchronization::MsgQueue<std::string>& queue,
-                     std::map<std::string, size_t>& words_map,
+                     WordFreqPtr words_freq,
                      const std::string& stop = "end");
 
   WordAppenderWorker() = delete;

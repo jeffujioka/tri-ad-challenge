@@ -1,13 +1,14 @@
 #include "tri-ad-challenge/word_appender_worker.h"
 
+#include "synchronization/object_frequency.h"
+
 namespace triad {
 
 using synchronization::MsgQueue;
 
-WordAppenderWorker::WordAppenderWorker(
-  synchronization::MsgQueue<std::string>& queue,
-  std::map<std::string, size_t>& words_map, const std::string& stop) 
-  : sync_queue_(queue),  words_map_(words_map), stop_(stop) {
+WordAppenderWorker::WordAppenderWorker(MsgQueue<std::string>& queue, 
+  WordFreqPtr words_freq, const std::string& stop) : sync_queue_(queue),
+  words_freq_(words_freq), stop_(stop) {
 }
 
 void WordAppenderWorker::operator()() {
@@ -23,18 +24,8 @@ void WordAppenderWorker::operator()() {
     
     if (!end_found)
     {
-      auto it = words_map_.find(word);
-
-      if (it != words_map_.end()) {
-        // 'word' is already present in the map
-        // let's increment the word counter 
-        ++(it->second);
-      } else {
-        // 'word' is not present in the map
-        // let's add 'word' with counter equal to zero
-        // insert 'word' ordered (case sensitive)
-        words_map_.emplace(word, 1);
-      }
+      // stop condition not found... so let's insert/increment a "new" word
+      words_freq_->InsertOrIncrement(word); // it's thread safe
     }
   }
 }
