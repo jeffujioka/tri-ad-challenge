@@ -1,0 +1,61 @@
+#pragma once
+
+#include <istream>
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include "synchronization/msg_queue.h"
+
+namespace triad {
+
+namespace synchronization {
+template<typename T>
+class MsgQueue;
+}
+
+class WordInputWorker {
+  using WordQueue = synchronization::MsgQueue<std::string>;
+  using WordQueuePtr = std::shared_ptr<WordQueue>;
+  
+  WordQueuePtr word_queue_;
+  std::string stop_;
+  std::istream& istream_;
+
+ public:
+  WordInputWorker(WordQueuePtr queue, const std::string &stop, std::istream &is)
+      : word_queue_(queue), stop_(stop), istream_(is) {}
+
+  // non default constructible                
+  WordInputWorker() = delete;
+  // non-copyable
+  WordInputWorker(const WordInputWorker&) = delete;
+  WordInputWorker& operator=(const WordInputWorker&) = delete;
+  // non-movable
+  WordInputWorker(const WordInputWorker&&) = delete;
+  WordInputWorker&& operator=(const WordInputWorker&&) = delete;
+
+  void operator()() {
+    if (!word_queue_ || stop_.empty()) return; // defensive programming
+    
+    bool shall_stop = false;
+
+    while (!shall_stop) {
+      std::string line;
+      // get line from istream_ 
+      std::getline(istream_, line);
+
+      std::stringstream ss(line);  // split line by " "
+      std::string word;
+
+      while (!ss.eof() && !shall_stop) {
+        ss >> word; // reading new work
+        // word.erase(remove_if(word.begin(), word.end(), &isValidChar), word.end());
+        shall_stop = word == stop_; // WARNING! compare it before moving 'word'
+        word_queue_->Send(std::move(word));  // thread safe
+      }
+    }
+  }
+};
+
+}  // namespace triad
