@@ -1,0 +1,62 @@
+#pragma once
+
+#include <future>
+#include <iostream>
+#include <memory>
+#include <string>
+
+#include "synchronization/object_frequency.h"
+
+namespace triad {
+
+class WordLookupWorker {
+  using WordFreq = synchronization::ObjectFrequency<std::string>;
+  using WordFreqPtr = std::shared_ptr<WordFreq>;
+
+  WordFreqPtr word_freq_; // thread-safe object to store/get word frequencies
+  std::istream &istream_;
+  std::ostream &ostream_;
+
+ public:
+  WordLookupWorker(WordFreqPtr freq, std::istream &is, std::ostream &os)
+      : word_freq_(freq), istream_(is), ostream_(os) {}
+
+  // non default constructible
+  WordLookupWorker() = delete;
+  // non-copyable
+  WordLookupWorker(const WordLookupWorker&) = delete;
+  WordLookupWorker& operator=(const WordLookupWorker&) = delete;
+  // non-move-assignable
+  WordLookupWorker& operator=(WordLookupWorker&&) = delete;
+  
+  // movable (to be possible to move it to std::thread)
+  WordLookupWorker(WordLookupWorker&& rhs) 
+      : 
+      word_freq_(std::move(rhs.word_freq_)), 
+      istream_(rhs.istream_), ostream_(rhs.ostream_) {}
+
+  void operator()(std::future<void>&& ready_future) {
+    // defensive programming
+    if (!word_freq_) 
+      throw std::runtime_error("Attribute word_freq_ is null.");  
+
+    // wait for user to enter the input data
+    ready_future.wait();
+    
+    std::string lookup_word;
+    ostream_ << "Enter a word for lookup: ";
+    istream_ >> lookup_word;
+    
+    auto word_frequency = word_freq_->Frequency(lookup_word);
+
+    if (word_frequency > 0) {
+      ostream_ << "SUCCESS: '" << lookup_word << "' was present "
+               << word_frequency << " times in the initial word list\n";
+    } else {
+      ostream_ << "'" << lookup_word 
+               << "' was NOT found in the initial word list\n";
+    }
+  }
+};
+
+}  // namespace triad

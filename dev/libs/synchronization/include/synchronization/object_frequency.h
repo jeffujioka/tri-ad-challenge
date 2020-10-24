@@ -54,6 +54,15 @@ public:
     return frequency;
   }
 
+  size_t Frequency(const T &obj) {
+    size_t frequency = 0;
+    {
+      std::lock_guard<std::mutex> lck(mtx_);
+      frequency = obj_freq_map_[obj];
+    }
+    return frequency;
+  }
+
   /// \brief   Returns a const reference of \a obj_freq_map_ inder to give
   ///          a read-only access to it.
   /// \return  Returns a const reference of \a obj_freq_map_
