@@ -1,5 +1,6 @@
 #pragma once
 
+#include <future>
 #include <istream>
 #include <memory>
 #include <string>
@@ -20,7 +21,7 @@ class WordInputWorker {
   
   WordQueuePtr word_queue_;
   std::string stop_;
-  std::istream& istream_;
+  std::istream& istream_; // to make this class testable
 
  public:
   WordInputWorker(WordQueuePtr queue, const std::string &stop, std::istream &is)
@@ -31,18 +32,25 @@ class WordInputWorker {
   // non-copyable
   WordInputWorker(const WordInputWorker&) = delete;
   WordInputWorker& operator=(const WordInputWorker&) = delete;
-  // non-movable
-  WordInputWorker(const WordInputWorker&&) = delete;
-  WordInputWorker&& operator=(const WordInputWorker&&) = delete;
-
-  void operator()() {
-    if (!word_queue_ || stop_.empty()) return; // defensive programming
+  // non-move-assignable
+  WordInputWorker& operator=(WordInputWorker&&) = delete;
+  
+  // movable (to be possible to move it to std::thread)
+  WordInputWorker(WordInputWorker&& rhs) 
+      : 
+      word_queue_(std::move(rhs.word_queue_)), 
+      stop_(std::move(rhs.stop_)), istream_(rhs.istream_) {}
+  
+  void operator()(std::promise<void>&& prom) {
+    CheckValidity(); // will throw if word_queue_ or stop_ are invalid
     
     bool shall_stop = false;
 
     while (!shall_stop) {
+      std::cout << "Enter a text: ";
       std::string line;
       // get line from istream_ 
+      // it can be the cin or a file (ifstrem which is used by the unit tests)
       std::getline(istream_, line);
 
       std::stringstream ss(line);  // split line by " "
@@ -50,10 +58,19 @@ class WordInputWorker {
 
       while (!ss.eof() && !shall_stop) {
         ss >> word; // reading new work
-        // word.erase(remove_if(word.begin(), word.end(), &isValidChar), word.end());
+        
         shall_stop = word == stop_; // WARNING! compare it before moving 'word'
         word_queue_->Send(std::move(word));  // thread safe
       }
+    }
+    
+    prom.set_value(); // notify completion of this thread
+  }
+
+ private:
+  void CheckValidity() const { 
+    if (!word_queue_ || stop_.empty()) { // defensive programming
+      throw std::runtime_error("Attributes word_queue_ or stop_ are invalid.");
     }
   }
 };

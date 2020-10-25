@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <thread>
 
 #include "tri-ad-challenge/word_input_worker"
 
@@ -10,15 +11,6 @@
 namespace triad {
 
 using synchronization::MsgQueue;
-
-class InputFile : public ::testing::Test {
- public:
-  void SetUp() {
-
-  }
-
-  void TearDown();
-};
 
 TEST(WordInputWorker_Test, TrivialCase) {
   std::ofstream out("in.txt");
@@ -31,10 +23,14 @@ TEST(WordInputWorker_Test, TrivialCase) {
 
   // TODO mock MsgQueue class
   auto queue = std::make_shared<MsgQueue<std::string>>();
-  WordInputWorker worker(queue, "end", in);
 
-  worker();
+  std::promise<void> prom;
+  auto future = prom.get_future();
 
+  std::thread worker(WordInputWorker(queue, "end", in), std::move(prom));
+
+  future.get();
+  worker.join();
   EXPECT_EQ("jefferson", queue->Receive());
   EXPECT_EQ("masahiro", queue->Receive());
   EXPECT_EQ("fujioka", queue->Receive());
@@ -58,7 +54,12 @@ TEST(WordInputWorker_Test, CheckMultipleLinesAndOrder) {
   auto queue = std::make_shared<MsgQueue<std::string>>();
   WordInputWorker worker(queue, "end", in);
 
-  worker();
+  std::promise<void> prom;
+  auto future = prom.get_future();
+
+  worker(std::move(prom));
+
+  future.wait();
 
   // TODO replace EXPECT_EQ by EXPECT_CALL after mocking MsgQueue class
   EXPECT_EQ("jefferson", queue->Receive());
@@ -73,6 +74,25 @@ TEST(WordInputWorker_Test, CheckMultipleLinesAndOrder) {
   EXPECT_EQ("steve", queue->Receive());
   EXPECT_EQ("jobs", queue->Receive());
   EXPECT_EQ("end", queue->Receive());
+}
+
+TEST(WordInputWorker_Test, CheckValidityNullMsgQueue) {
+  // TODO mock MsgQueue class
+  WordInputWorker worker(nullptr, "end", std::cin);
+
+  std::promise<void> prom;
+
+  EXPECT_THROW(worker(std::move(prom)), std::exception);
+}
+
+TEST(WordInputWorker_Test, CheckValidityEmptyStop) {
+  // TODO mock MsgQueue class
+  WordInputWorker worker(std::make_shared<MsgQueue<std::string>>(), 
+                         "", std::cin);
+
+  std::promise<void> prom;
+
+  EXPECT_THROW(worker(std::move(prom)), std::exception);
 }
 
 }
