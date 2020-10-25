@@ -6,31 +6,35 @@
 #include <memory>
 #include <string>
 
-#include "synchronization/msg_queue.h"
-
 namespace triad {
 
 namespace synchronization {
+template<typename T>
+class MsgQueue;
 template<typename T>
 class ObjectFrequency;
 }
 
 class WordAppenderWorker {
+  using MsgQueueStr = synchronization::MsgQueue<std::string>;
+  using MsgQueueStrPtr = std::shared_ptr<MsgQueueStr>;
   using WordFreq = synchronization::ObjectFrequency<std::string>;
   using WordFreqPtr = std::shared_ptr<WordFreq>;
 
-  synchronization::MsgQueue<std::string>& sync_queue_;
+  MsgQueueStrPtr sync_queue_;
   WordFreqPtr words_freq_;
   std::string stop_;
 
 public:
-  WordAppenderWorker(synchronization::MsgQueue<std::string>& queue,
+  WordAppenderWorker(MsgQueueStrPtr queue,
                      WordFreqPtr words_freq,
                      const std::string& stop = "end");
 
   WordAppenderWorker() = delete;
   WordAppenderWorker(const WordAppenderWorker&) = delete;
   WordAppenderWorker& operator=(const WordAppenderWorker&) = delete;
+  WordAppenderWorker(WordAppenderWorker&&) = default;
+  WordAppenderWorker& operator=(WordAppenderWorker&&) = default;
 
   void operator()();
 
