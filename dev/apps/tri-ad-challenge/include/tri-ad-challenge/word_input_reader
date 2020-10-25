@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <future>
 #include <istream>
 #include <memory>
@@ -8,6 +9,8 @@
 
 #include "synchronization/msg_queue.h"
 
+#include "tri-ad-challenge/user_input"
+
 namespace triad {
 
 namespace synchronization {
@@ -15,43 +18,41 @@ template<typename T>
 class MsgQueue;
 }
 
-class WordInputWorker {
+class WordInputReader {
   using WordQueue = synchronization::MsgQueue<std::string>;
   using WordQueuePtr = std::shared_ptr<WordQueue>;
   
   WordQueuePtr word_queue_;
   std::string stop_;
-  std::istream& istream_; // to make this class testable
+  // The message to be displayed to ask the user for data.
+  std::string msg_;
 
  public:
-  WordInputWorker(WordQueuePtr queue, const std::string &stop, std::istream &is)
-      : word_queue_(queue), stop_(stop), istream_(is) {}
+  WordInputReader(WordQueuePtr queue, const std::string &stop,
+      const std::string& msg = "Enter a text: ")
+      : word_queue_(queue), stop_(stop), msg_(msg) {}
 
   // non default constructible                
-  WordInputWorker() = delete;
+  WordInputReader() = delete;
   // non-copyable
-  WordInputWorker(const WordInputWorker&) = delete;
-  WordInputWorker& operator=(const WordInputWorker&) = delete;
+  WordInputReader(const WordInputReader&) = delete;
+  WordInputReader& operator=(const WordInputReader&) = delete;
   // non-move-assignable
-  WordInputWorker& operator=(WordInputWorker&&) = delete;
+  WordInputReader& operator=(WordInputReader&&) = delete;
   
   // movable (to be possible to move it to std::thread)
-  WordInputWorker(WordInputWorker&& rhs) 
+  WordInputReader(WordInputReader&& rhs) 
       : 
       word_queue_(std::move(rhs.word_queue_)), 
-      stop_(std::move(rhs.stop_)), istream_(rhs.istream_) {}
+      stop_(std::move(rhs.stop_)), msg_(std::move(rhs.msg_)) {}
   
-  void operator()(std::promise<void>&& prom) {
+  void AskWords(const UserInputFn& user_in_fn = AskUserInput) {
     CheckValidity(); // will throw if word_queue_ or stop_ are invalid
     
     bool shall_stop = false;
 
     while (!shall_stop) {
-      std::cout << "Enter a text: ";
-      std::string line;
-      // get line from istream_ 
-      // it can be the cin or a file (ifstrem which is used by the unit tests)
-      std::getline(istream_, line);
+      std::string line = user_in_fn(msg_);
 
       std::stringstream ss(line);  // split line by " "
       std::string word;
@@ -63,8 +64,6 @@ class WordInputWorker {
         word_queue_->Send(std::move(word));  // thread safe
       }
     }
-    
-    prom.set_value(); // notify completion of this thread
   }
 
  private:

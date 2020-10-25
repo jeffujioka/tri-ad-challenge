@@ -8,17 +8,18 @@
 
 namespace triad {
 
+template<typename T>
+class ObjectFrequency;
+
 namespace synchronization {
 template<typename T>
 class MsgQueue;
-template<typename T>
-class ObjectFrequency;
 }
 
 class WordAppenderWorker {
   using MsgQueueStr = synchronization::MsgQueue<std::string>;
   using MsgQueueStrPtr = std::shared_ptr<MsgQueueStr>;
-  using WordFreq = synchronization::ObjectFrequency<std::string>;
+  using WordFreq = ObjectFrequency<std::string>;
   using WordFreqPtr = std::shared_ptr<WordFreq>;
 
   MsgQueueStrPtr sync_queue_;

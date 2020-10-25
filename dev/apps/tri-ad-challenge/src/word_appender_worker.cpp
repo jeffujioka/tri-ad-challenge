@@ -1,7 +1,8 @@
 #include "tri-ad-challenge/word_appender_worker.h"
 
+#include "tri-ad-challenge/object_frequency"
+
 #include "synchronization/msg_queue.h"
-#include "synchronization/object_frequency.h"
 
 namespace triad {
 

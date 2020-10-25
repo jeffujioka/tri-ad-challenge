@@ -1,0 +1,90 @@
+#pragma once
+
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <sstream>
+
+#include "tri-ad-challenge/object_frequency"
+#include "tri-ad-challenge/user_input"
+
+namespace triad {
+
+class UserInput;
+
+class WordLookuper {
+  using WordFreq = ObjectFrequency<std::string>;
+  using WordFreqPtr = std::shared_ptr<WordFreq>;
+  using UserInputFn = std::function<std::string(const std::string&)>;
+  using UserOutputFn = std::function<void(const std::string&, size_t)>;
+
+  WordFreqPtr word_freq_;
+  // The message to be displayed to ask the user for data.
+  std::string msg_;
+ public:
+  WordLookuper(WordFreqPtr freq, 
+               const std::string& msg = "Enter a word for lookup: ") 
+      : word_freq_(freq), msg_(msg) {}
+
+  // non default constructible
+  WordLookuper() = delete;
+  // non-copyable
+  WordLookuper(const WordLookuper&) = delete;
+  WordLookuper& operator=(const WordLookuper&) = delete;
+  // non-move-assignable
+  WordLookuper& operator=(WordLookuper&&) = delete;
+  
+  // movable (to be possible to move it to std::thread)
+  WordLookuper(WordLookuper&& rhs) 
+      : 
+      word_freq_(std::move(rhs.word_freq_)) {}
+
+  /// \brief     Repeatedly asks the user for a word and check whether it is 
+  ///            present in the 'word_freq_'.
+  ///            Terminate on EOF.
+  ///
+  /// \param[in] user_in_fn    Function pointer to ask user to enter a word to 
+  ///                          lookup for.
+  ///                          Default value: AskUserInput
+  ///                          It makes life easier to test it.
+  /// \param[in] user_out_fn   Function pointer to print the results.
+  ///                          Default value: WordLookuper::PrintResult
+  ///                          It makes life easier to test it.
+  void LookupRepeatedly(const UserInputFn& user_in_fn = AskUserInput,
+      const UserOutputFn& user_out_fn = WordLookuper::PrintResult) {
+    // defensive programming
+    if (!word_freq_) 
+      throw std::runtime_error("Invalid WordFreqPtr!");
+    else if (!user_in_fn)
+      throw std::runtime_error("Invalid UserInputFn!");
+    else if (!user_out_fn)
+      throw std::runtime_error("Invalid UserOutputFn!");
+    
+    
+    std::string lookup_word;
+
+    do {
+      lookup_word = user_in_fn(msg_);
+
+      if (!lookup_word.empty()) {
+        auto word_frequency = word_freq_->Frequency(lookup_word);
+
+        user_out_fn(lookup_word, word_frequency);
+      }
+    } while (!lookup_word.empty());
+  }
+
+ private:
+  static void PrintResult(const std::string& word, size_t frequency) {
+    if (frequency > 0) {
+      std::cout << "    FOUND: '" << word << "' was present "
+                << frequency << " times in the initial word list\n";
+    } else {
+      std::cout << "NOT FOUND: '" << word 
+                << "' was NOT found in the initial word list\n";
+    }
+  }
+};
+
+}  // namespace triad

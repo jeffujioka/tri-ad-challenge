@@ -3,17 +3,17 @@
 #include <thread>
 
 #include "synchronization/msg_queue.h"
-#include "synchronization/object_frequency.h"
 
+#include "tri-ad-challenge/object_frequency"
 #include "tri-ad-challenge/word_appender_worker.h"
-#include "tri-ad-challenge/word_lookup_worker"
-#include "tri-ad-challenge/word_input_worker"
+#include "tri-ad-challenge/word_lookuper"
+#include "tri-ad-challenge/word_input_reader"
 
+using triad::ObjectFrequency;
 using triad::WordAppenderWorker;
-using triad::WordInputWorker;
-using triad::WordLookupWorker;
+using triad::WordInputReader;
+using triad::WordLookuper;
 using triad::synchronization::MsgQueue;
-using triad::synchronization::ObjectFrequency;
 
 int main ()
 {
@@ -23,37 +23,32 @@ int main ()
     auto word_freq = std::make_shared<ObjectFrequency<std::string>>();
 
     std::promise<void> ready_promise;
-    auto ready_future = ready_promise.get_future();
     std::string stop_condition{"end"};
 
-    // 'tlookup' repeatedly ask the user for a word and check whether 
-    // it was present in the word list. 
-    // Terminate on EOF.
-    // It will be waiting for 'ready_future' std::future notification
-    // which will be emitted by 'input_thread' as soon as the user enter
-    // the 'stop_condition' (string "end")
-    // Actually, there is no need to have this thread once it will start 
-    // processing only after the completion of tasks 'tappender' and 'tinput'. 
-    // I made this way only to "exercise" this threaded-env scenario
-    std::thread tlookup(WordLookupWorker(word_freq, std::cin, std::cout),
-                        std::move(ready_future));
     // 'tappender' consumes words received from the 'tinput' through 'queue' 
     // (MsgQueue<std::string> - it's a thread-safe queue) and insert them 
-    // in the 'word_freq' (ObjectFrequency<std::string> - it's a 
-    // thread-safe map), duplicates are discarded.
+    // in the 'word_freq', duplicated values increase by one the frequency 
+    // counter in the 'word_freq'.
     // Terminate when the 'stop_condition' (string "end") is encountered.
     std::thread tappender(WordAppenderWorker(queue, word_freq, stop_condition));
-    // Read input words from STDIN and pass them to the 'tlookup' through
+
+    WordInputReader input_reader(queue, stop_condition);
+    // Read input words from STDIN and pass them to the 'lookup' through
     // 'queue' for inclusion in the 'word_freq'.
     // Terminate when the 'stop_condition' (string "end") is entered.
-    std::thread tinput(WordInputWorker(queue, stop_condition, std::cin),
-                       std::move(ready_promise));
+    input_reader.AskWords();
 
-    tlookup.join();
+    // it'll terminate when 'input_reader' send the 'stop_condition' ("end")
     tappender.join();
-    tinput.join();
 
-    // std::cout << *word_freq << std::endl;
+    WordLookuper lookup(word_freq);
+    // 'WordLookuper' repeatedly ask the user for a word and check whether 
+    // it is present in the 'word_freq'.
+    // Terminate on EOF.
+    lookup.LookupRepeatedly();
+
+    //std::cout << *word_freq << std::endl;
+    std::cout << std::endl << "Take care!!!" << std::endl;
   }
   catch (std::exception & e)
   {

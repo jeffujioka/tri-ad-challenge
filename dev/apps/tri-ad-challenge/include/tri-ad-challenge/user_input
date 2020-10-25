@@ -1,0 +1,18 @@
+#pragma once
+
+#include <functional>
+#include <iostream>
+#include <string>
+
+namespace triad {
+
+using UserInputFn = std::function<std::string(const std::string&)>;
+
+static std::string AskUserInput(const std::string& msg) {
+    std::string line;
+    if (!msg.empty()) std::cout << msg;
+
+    std::getline(std::cin, line);
+    return line; // it will return "" when EOF is reached
+  }
+} // namespace triad

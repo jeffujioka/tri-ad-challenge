@@ -3,14 +3,14 @@
 #include "tri-ad-challenge/word_appender_worker.h"
 
 #include "synchronization/msg_queue.h"
-#include "synchronization/object_frequency.h"
+
+#include "tri-ad-challenge/object_frequency"
 
 namespace triad {
 
 using namespace std;
 
 using synchronization::MsgQueue;
-using synchronization::ObjectFrequency;
 
 TEST(WordAppenderWorker_Test, BaseCase) {
   auto queue = std::make_shared<MsgQueue<std::string>>();

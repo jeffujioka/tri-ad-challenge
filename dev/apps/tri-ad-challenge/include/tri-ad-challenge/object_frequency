@@ -2,20 +2,16 @@
 
 #include <cstddef>
 #include <map>
-#include <mutex>
 #include <ostream>
 
 #include <gtest/gtest_prod.h>
 
 namespace triad {
-namespace synchronization {
 
 template<typename T>
 class ObjectFrequency {
-  mutable std::mutex mtx_;
-  // it obj_freq_map_ could be templatized as well
-  // perhaps is not relevant so std::unordered_map could be used 
-  // to improve perfomance on insertion/finding
+  // if ordering is not relevant then in this case std::unordered_map 
+  // could be used to improve perfomance on insertion/finding
   std::map<T, size_t> obj_freq_map_;
 
 public:
@@ -34,32 +30,26 @@ public:
   /// \return    Returns the frequency counter for the given object \a obj.
   size_t InsertOrIncrement(const T& obj) {
     size_t frequency = 0;
-    {
-      std::lock_guard<std::mutex> lck(mtx_);
-      auto it = obj_freq_map_.find(obj);
+    auto it = obj_freq_map_.find(obj);
 
-      if (it != obj_freq_map_.end()) {
-        // 'obj' is already present in the map
-        // let's increment the frequency counter 
-        ++(it->second);
-        frequency = it->second;
-      } else {
-        // 'obj' is not present in the map
-        // let's add 'obj' with counter equal to one
-        // insert 'obj' ordered
-        frequency = 1;
-        obj_freq_map_.emplace(obj, frequency);
-      }
+    if (it != obj_freq_map_.end()) {
+      // 'obj' is already present in the map
+      // let's increment the frequency counter 
+      ++(it->second);
+      frequency = it->second;
+    } else {
+      // 'obj' is not present in the map
+      // let's add 'obj' with counter equal to one
+      // insert 'obj' ordered
+      frequency = 1;
+      obj_freq_map_.emplace(obj, frequency);
     }
     return frequency;
   }
 
   size_t Frequency(const T &obj) {
-    size_t frequency = 0;
-    {
-      std::lock_guard<std::mutex> lck(mtx_);
-      frequency = obj_freq_map_[obj];
-    }
+    size_t frequency = obj_freq_map_[obj];
+    
     return frequency;
   }
 
@@ -76,8 +66,6 @@ public:
 
 private:
   void Print(std::ostream& oss) const {
-    std::lock_guard<std::mutex> lck(mtx_);
-
     for (const auto& [key, value] : obj_freq_map_) {
       oss << key << " " << value << "\n";
     }
@@ -90,10 +78,8 @@ private:
 template<typename Obj>
 std::ostream& operator<<(std::ostream& oss, 
                          const ObjectFrequency<Obj>& rhs) {
-  // print is thread safe
   rhs.Print(oss);
   return oss;  
 }
 
-} // namespace synchronization
 } // namespace triad

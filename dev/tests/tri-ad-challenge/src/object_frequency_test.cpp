@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "synchronization/object_frequency.h"
+#include "tri-ad-challenge/object_frequency"
 
 #include <string>
 #include <iostream>
@@ -8,7 +8,6 @@
 using namespace std;
 
 namespace triad {
-namespace synchronization {
 
 TEST(ObjectFrequency_Test, IntFrequency) {
   ObjectFrequency<int> freq;
@@ -63,5 +62,4 @@ TEST(ObjectFrequency_Test, CheckOrder) {
   EXPECT_EQ("bbb", it->first);
 }
 
-}
 }
