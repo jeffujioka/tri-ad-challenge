@@ -1,159 +1,65 @@
+#include <future>
+#include <iostream>
 #include <thread>
-#include <vector>
-#include <algorithm>
-#include <cstdio>
-#include <cstring>
 
-// temporarily "disabling" it to to "get rid" of std::gets 
-// to be possible to compile with c++17
-#if 0
-struct Word
-{
-  char * data;
-  int count;
+#include "synchronization/msg_queue.h"
+#include "synchronization/object_frequency.h"
 
-  Word ( char * data_ ) :
-    data( ::strdup(data_) )
-  {}
-  
-  Word () :
-    data((char *)"")
-  {}
-};
+#include "tri-ad-challenge/word_appender_worker.h"
+#include "tri-ad-challenge/word_lookup_worker"
+#include "tri-ad-challenge/word_input_worker"
 
-static std::vector<Word*> s_wordsArray;
-static Word s_word;
-static int s_totalFound;
+using triad::WordAppenderWorker;
+using triad::WordInputWorker;
+using triad::WordLookupWorker;
+using triad::synchronization::MsgQueue;
+using triad::synchronization::ObjectFrequency;
 
-
-// Worker thread: consume words passed from the main thread and insert them
-// in the 'word list' (s_wordsArray), while removing duplicates. Terminate when
-// the word 'end' is encountered.
-static void workerThread ()
-{
-  bool endEncountered = false;
-  bool found = false;
-  
-  while (!endEncountered)
-  {
-    if (s_word.data[0]) // Do we have a new word?
-    {
-      Word * w = new Word(s_word); // Copy the word
-      
-      s_word.data[0] = 0; // Inform the producer that we consumed the word
-      
-      endEncountered = std::strcmp( s_word.data, "end" ) == 0;
-      
-      if (!endEncountered)
-      {
-        // Do not insert duplicate words
-        for ( auto p : s_wordsArray )
-        {
-          if (!std::strcmp( p->data, w->data ))
-          {
-            ++p->count;
-            found = true;
-            break;
-          }
-        }
-
-        if (!found)
-          s_wordsArray.push_back( w );
-      }
-    }
-  }
-};
-
-// Read input words from STDIN and pass them to the worker thread for
-// inclusion in the word list.
-// Terminate when the word 'end' has been entered.
-//
-static void readInputWords ()
-{
-  bool endEncountered = false;
-  
-  std::thread * worker = new std::thread( workerThread );
-
-  char * linebuf = new char[32];
-  
-  while (!endEncountered)
-  {
-    if (!std::gets( linebuf )) // EOF?
-      return;
-    
-    endEncountered = std::strcmp( linebuf, "end" ) == 0;
-
-    // Pass the word to the worker thread
-    std::strcpy( s_word.data, linebuf );
-    while (s_word.data[0]); // Wait for the worker thread to consume it
-  }
-
-  worker->join(); // Wait for the worker to terminate
-}
-
-// Repeatedly ask the user for a word and check whether it was present in the word list
-// Terminate on EOF
-//
-static void lookupWords ()
-{
-  bool found;
-  char * linebuf = new char[32];
-    
-  for(;;)
-  {
-    std::printf( "\nEnter a word for lookup:" );
-    if (std::scanf( "%s", linebuf ) == EOF)
-      return;
-
-    // Initialize the word to search for
-    Word * w = new Word();
-    std::strcpy( w->data, linebuf );
-
-    // Search for the word
-    unsigned i;
-    for ( i = 0; i < s_wordsArray.size(); ++i )
-    {
-      if (std::strcmp( s_wordsArray[i]->data, w->data ) == 0)
-      {
-        found = true;
-        break;
-      }
-    }
-
-    if (found)
-    {
-      std::printf( "SUCCESS: '%s' was present %d times in the initial word list\n",
-                   s_wordsArray[i]->data, s_wordsArray[i]->count );
-      ++s_totalFound;
-    }
-    else
-      std::printf( "'%s' was NOT found in the initial word list\n", w->data );
-  }
-}
-#endif
 int main ()
 {
   try
   {
-#if 0
-    readInputWords();
-    
-    // Sort the words alphabetically
-    std::sort( s_wordsArray.begin(), s_wordsArray.end() );
+    auto queue = std::make_shared<MsgQueue<std::string>>();
+    auto word_freq = std::make_shared<ObjectFrequency<std::string>>();
 
-    // Print the word list
-    std::printf( "\n=== Word list:\n" );
-    for ( auto p : s_wordsArray )
-      std::printf( "%s %d\n", p->data, p->count );
+    std::promise<void> ready_promise;
+    auto ready_future = ready_promise.get_future();
+    std::string stop_condition{"end"};
 
-    lookupWords();
+    // 'tlookup' repeatedly ask the user for a word and check whether 
+    // it was present in the word list. 
+    // Terminate on EOF.
+    // It will be waiting for 'ready_future' std::future notification
+    // which will be emitted by 'input_thread' as soon as the user enter
+    // the 'stop_condition' (string "end")
+    // Actually, there is no need to have this thread once it will start 
+    // processing only after the completion of tasks 'tappender' and 'tinput'. 
+    // I made this way only to "exercise" this threaded-env scenario
+    std::thread tlookup(WordLookupWorker(word_freq, std::cin, std::cout),
+                        std::move(ready_future));
+    // 'tappender' consumes words received from the 'tinput' through 'queue' 
+    // (MsgQueue<std::string> - it's a thread-safe queue) and insert them 
+    // in the 'word_freq' (ObjectFrequency<std::string> - it's a 
+    // thread-safe map), duplicates are discarded.
+    // Terminate when the 'stop_condition' (string "end") is encountered.
+    std::thread tappender(WordAppenderWorker(queue, word_freq, stop_condition));
+    // Read input words from STDIN and pass them to the 'tlookup' through
+    // 'queue' for inclusion in the 'word_freq'.
+    // Terminate when the 'stop_condition' (string "end") is entered.
+    std::thread tinput(WordInputWorker(queue, stop_condition, std::cin),
+                       std::move(ready_promise));
 
-    printf( "\n=== Total words found: %d\n", s_totalFound );
-#endif
+    tlookup.join();
+    tappender.join();
+    tinput.join();
+
+    // std::cout << *word_freq << std::endl;
   }
   catch (std::exception & e)
   {
-    std::printf( "error %s\n", e.what() );
+    std::cout << "error: " << e.what() << "\n";
+  } catch (...) {
+    std::cout << "Unexpected error has happened!\n";
   }
   
   return 0;
